@@ -8,6 +8,7 @@
 
     <!--THREE.JS script-->
     <script src="scripts/three.js"></script>
+    <script src="scripts/jquery.min.js"></script>
     <!--VR Control scripts-->
     <script src="scripts/VRControls.js"></script>
     <script src="scripts/VREffect.js"></script>
@@ -15,6 +16,8 @@
     <script src="scripts/leap-0.6.4.js"></script>
     <script src="scripts/leap-plugins-0.1.11pre.js"></script>
     <!--<script src="scripts/leap-plugins-0.1.6.js"></script> THIS DOESN'T WORK-->
+    <script src="scripts/LeapCameraControls.js"></script>
+    <script src="scripts/LeapObjectControls.js"></script>
 	</head>
 
 	<body>
@@ -22,188 +25,199 @@
 	</body>
 
 
-<script>
-  // Including this in the footer so that the bone hand plugin can create its canvas on the body
+  <script>
+    // Including this in the footer so that the bone hand plugin can create its canvas on the body
 
-  /////////////////////////////////////////////////////////////////////////////////////////////
-  // CREATE THE SCENE
-  //
+    /////////////////////////////////////////////////////////////////////////////////////////////
+    // CREATE THE SCENE
+    //
 
-    // Set Global Variables
-    var scene, camera, canvas, renderer;
+      // Set Global Variables
+      var scene, camera, canvas, renderer;
 
-    // Set up scene and cameras
-    scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera( 90, window.innerWidth / window.innerHeight, 0.001, 700 );
-    camera.position.set (10, 10, 0);
-    camera.position.z = 10;
-    scene.add(camera);
+      // Set up scene and cameras
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera( 90, window.innerWidth / window.innerHeight, 0.001, 700 );
+      camera.position.set (10, 10, 0);
+      camera.position.z = 20;
+      scene.add(camera);
 
-    // Set up canvas for bone plugin to load
-    canvas = document.getElementById('scene');
-    canvas.style.position = 'absolute';
-    canvas.style.top = 0;
-    canvas.style.left = 0;
+      // Set up canvas for bone plugin to load
+      canvas = document.getElementById('scene');
+      canvas.style.position = 'absolute';
+      canvas.style.top = 0;
+      canvas.style.left = 0;
 
-    // Set up renderer
-    renderer = new THREE.WebGLRenderer({ antialias: true, canvas: canvas });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-
-    // Set up window resize handler
-    onResize = function() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
+      // Set up renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true, canvas: canvas });
       renderer.setSize(window.innerWidth, window.innerHeight);
-    };
-    window.addEventListener('resize', onResize, false);
 
-    // Set up lighting
-    var light = new THREE.AmbientLight( 0x404040 );
-    scene.add(light);
+      // Set up window resize handler
+      onResize = function() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      };
+      window.addEventListener('resize', onResize, false);
 
-    // Generate axes in scene for reference
-    var axis = new THREE.AxisHelper( 250 );
-    scene.add( axis );
+      // Set up lighting
+      var ambientLight = new THREE.AmbientLight( 0x404040 );
+      scene.add(ambientLight);
 
-    // Generate ground plane (box) in scene for reference
-    mesh = new THREE.GridHelper( 250, 10 );
-    scene.add( mesh );
+      var directionalLight = new THREE.DirectionalLight( 0xffffff, 0.5 );
+      directionalLight.position.set( 0, 1, 0 );
+      scene.add( directionalLight );
 
-    // Creating skybox particles to help give people reference points when rotating
-    for( var i = 0; i < 10; i++ ){
-      var geometry = new THREE.Geometry();
+      // Generate axes in scene for reference
+      var axis = new THREE.AxisHelper( 250 );
+      scene.add( axis );
 
-      for( var j = 0; j < 1000; j++ ){
-        var x = (Math.random() - .2 ) * 2000;
-        var y = (Math.random() - .2 ) * 2000;
-        var z = (Math.random() - .2 ) * 2000;
-        geometry.vertices.push( new THREE.Vector3( x , y , z ) );
+      var origin = new THREE.Vector3( 0, 0, 0 );
+      var coords1 = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), origin, 300, 0xcd0000);
+      var coords2 = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), origin, 300, 0x18cd00);
+      var coords3 = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), origin, 300, 0x0022cd);
+      scene.add(coords1, coords2, coords3);
+
+      // Generate ground plane (box) in scene for reference
+      mesh = new THREE.GridHelper( 250, 10 );
+      scene.add( mesh );
+
+      // Creating skybox particles to help give people reference points when rotating
+      for( var i = 0; i < 10; i++ ){
+        var geometry = new THREE.Geometry();
+
+        for( var j = 0; j < 1000; j++ ){
+          var x = (Math.random() - .2 ) * 2000;
+          var y = (Math.random() - .2 ) * 2000;
+          var z = (Math.random() - .2 ) * 2000;
+          geometry.vertices.push( new THREE.Vector3( x , y , z ) );
+        }
+
+        var color = new THREE.Color( 0xffffff );
+        var material = new THREE.ParticleSystemMaterial( { size: 1, color: color });
+        var particleSystem = new THREE.ParticleSystem( geometry , material );
+        scene.add( particleSystem );
       }
 
-      var color = new THREE.Color( 0xffffff );
-      var material = new THREE.ParticleSystemMaterial( { size: 2, color: color });
-      var particleSystem = new THREE.ParticleSystem( geometry , material );
-      scene.add( particleSystem );
-    }
+    /////////////////////////////////////////////////////////////////////////////////////////////
+    // ADD LEAP MOTION
+    //
 
-  /////////////////////////////////////////////////////////////////////////////////////////////
-  // ADD LEAP MOTION
-  //
+    // Connect to localhost and start getting frames
+    Leap.loop();
+    Leap.loopController.use('transform', {
+      // This matrix flips the x, y, and z axis, scales to meters, and offsets the hands by -8cm.
+      vr: true,
+      effectiveParent: camera
+    });
 
-  // Connect to localhost and start getting frames
-  Leap.loop();
-  Leap.loopController.use('transform', {
-    // This matrix flips the x, y, and z axis, scales to meters, and offsets the hands by -8cm.
-    vr: true,
-    effectiveParent: camera
-  });
+    // Pass in the scene and display the arms
+    Leap.loopController.use('boneHand', {
+      scene: scene,
+      arm: true
+    });
 
-  // Pass in the scene and display the arms
-  Leap.loopController.use('boneHand', {
-    scene: scene,
-    arm: true
-  });
+    /////////////////////////////////////////////////////////////////////////////////////////////
+    // ADD VIRTUAL REALITY
+    //
 
-  /////////////////////////////////////////////////////////////////////////////////////////////
-  // ADD VIRTUAL REALITY
-  //
-
-  // Moves (translates and rotates) the camera
-  var vrControls = new THREE.VRControls(camera, function(message){
-    console.log(message);
-  });
-
-  var vrEffect = new THREE.VREffect(renderer, function(message){
+    // Moves (translates and rotates) the camera
+    var vrControls = new THREE.VRControls(camera, function(message){
       console.log(message);
     });
 
-  /////////////////////////////////////////////////////////////////////////////////////////////
-  // SET UP FUNCTIONS FOR SHORTCUTS
-  //
+    var vrEffect = new THREE.VREffect(renderer, function(message){
+        console.log(message);
+      });
 
-  var onkey = function(event) {
-    if (event.key === 'z' || event.keyCode === 122) {
-      vrControls.zeroSensor();
-    }
+    /////////////////////////////////////////////////////////////////////////////////////////////
+    // SET UP FUNCTIONS FOR SHORTCUTS
+    //
 
-    if (event.key === 'f' || event.keyCode === 102) {
-      console.log('f');
-      return vrEffect.setFullScreen(true);
-    }
-  };
+    var onkey = function(event) {
+      if (event.key === 'z' || event.keyCode === 122) {
+        vrControls.zeroSensor();
+      }
 
-  window.addEventListener("keypress", onkey, true);
+      if (event.key === 'f' || event.keyCode === 102) {
+        console.log('f');
+        return vrEffect.setFullScreen(true);
+      }
+    };
 
-  /////////////////////////////////////////////////////////////////////////////////////////////
-  // BUILD THINGS IN THE SCENE
-  //
+    window.addEventListener("keypress", onkey, true);
 
-  // BIMserver JSON loader goes here
-  
-  // BEGIN Clara.io JSON loader code
-  var objectLoader = new THREE.ObjectLoader();
-  objectLoader.load("models/teapot-claraio.json", function ( obj ) {
-    scene.add( obj );
-  } );
-  // END Clara.io JSON loader code
+    /////////////////////////////////////////////////////////////////////////////////////////////
+    // BUILD THINGS IN THE SCENE
+    //
 
-  // Create geometry to look at
-  var geo = new THREE.BoxGeometry( 40, 40, 40, 20, 20, 20 ); 
-  var mat = new THREE.MeshBasicMaterial( { color: 0xe7d300, wireframe: true } ); 
-  var cube = new THREE.Mesh( geo , mat );
-  scene.add( cube );
+    // BIMserver JSON loader goes here
+    
+    // TEMPORARY DEMO Clara.io JSON loader code
+    var objectLoader = new THREE.ObjectLoader();
+    objectLoader.load("models/teapot-claraio.JSON", function ( obj ) {
+      scene.add( obj );
+    } );
 
-  /////////////////////////////////////////////////////////////////////////////////////////////
-  // RENDER THE SHITE
-  //
+    // Create geometry to control with leap
+    var geo = new THREE.BoxGeometry( 20, 20, 20, 6, 6, 6 ); 
+    var mat = new THREE.MeshBasicMaterial( { color: 0xe7d300, wireframe: true } ); 
+    var cubea = new THREE.Mesh( geo , mat );
+    scene.add(cubea);
 
-  var render = function() {
-    vrControls.update();
-    vrEffect.render(scene, camera);
-    requestAnimationFrame(render);
-  };
+    var geo = new THREE.BoxGeometry( 10, 10, 10, 6, 6, 6 ); 
+    var mat = new THREE.MeshBasicMaterial( { color: 0xe76200, wireframe: true } ); 
+    var cubeb = new THREE.Mesh( geo , mat );
+    scene.add(cubeb);
 
-  render();
+    var geo = new THREE.BoxGeometry( 5, 5, 5, 6, 6, 6 ); 
+    var mat = new THREE.MeshBasicMaterial( { color: 0xe73100, wireframe: true } ); 
+    var cubec = new THREE.Mesh( geo , mat );
+    scene.add(cubec);
 
+    /////////////////////////////////////////////////////////////////////////////////////////////
+    // RENDER THE SHITE
+    //
 
+    function render() {
 
+      cubea.rotation.x += 0.001;
+      cubea.rotation.y += 0.001;
+      cubea.rotation.z += 0.001;
 
+      cubeb.rotation.x -= 0.003;
+      cubeb.rotation.y -= 0.003;
+      cubeb.rotation.z -= 0.003;
 
+      cubec.rotation.x += 0.005;
+      cubec.rotation.y += 0.005;
+      cubec.rotation.z += 0.005;
 
+      vrControls.update();
+      vrEffect.render(scene, camera);
+      requestAnimationFrame(render);
+    };
 
+    render();
 
+    /////////////////////////////////////////////////////////////////////////////////////////////
+    // Add a debug message. Prints when receiving oculus data.
+    //
 
-
-
-  //
-  // Add a debug message Real quick
-  // Prints out when receiving oculus data.
-  //
-  //
-
-  var receivingPositionalData = false;
-  var receivingOrientationData = false;
-
-  var timerID = setInterval(function(){
-
-    if (camera.position.x !== 0 && !receivingPositionalData){
-      receivingPositionalData = true;
-      console.log("receiving positional data");
-    }
-
-    if (camera.quaternion.x !== 0 && !receivingOrientationData){
-      receivingOrientationData = true;
-      console.log("receiving orientation data");
-    }
-
-    if (receivingOrientationData && receivingPositionalData){
-      clearInterval(timerID);
-    }
-
-  }, 2000);
-
-
-
-
-</script>
+    var receivingPositionalData = false;
+    var receivingOrientationData = false;
+    var timerID = setInterval(function(){
+      if (camera.position.x !== 0 && !receivingPositionalData){
+        receivingPositionalData = true;
+        console.log("Oculus receiving positional data");
+      }
+      if (camera.quaternion.x !== 0 && !receivingOrientationData){
+        receivingOrientationData = true;
+        console.log("Oculus receiving orientation data");
+      }
+      if (receivingOrientationData && receivingPositionalData){
+        clearInterval(timerID);
+      }
+    }, 2000);
+  </script>
 </html>
